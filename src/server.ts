@@ -35,7 +35,7 @@ async function main() {
   const db = client.db('FrontBase')
   const initialisedFlag = await db
     .collection('Objects')
-    .findOne({ '_meta.modelId': 'User' })
+    .findOne({ '_meta.modelId': 'user' })
 
   serverState = initialisedFlag ? 'ready' : 'uninitalised'
   if (serverState === 'uninitalised')
@@ -84,7 +84,7 @@ async function main() {
           const db = client.db('FrontBase')
           const user = await db
             .collection('Objects')
-            .findOne({ '_meta.modelId': 'User', username: socket.decoded.sub })
+            .findOne({ '_meta.modelId': 'user', username: socket.decoded.sub })
           if (user) {
             // Our connection with the user has been authenticated. From here on we can have our regular socket interaction.
             socket.user = user
@@ -94,10 +94,19 @@ async function main() {
             // Authenticated socket events
             // Get Objects
             socket.on('getObjects', async (modelId, filter, then) => {
+              const model = await db
+                .collection('Models')
+                .findOne({ $or: [{ key: modelId }, { key_plural: modelId }] })
+
               const result = await db
                 .collection('Objects')
-                .find({ ...filter, '_meta.modelId': modelId })
+                .find({ ...filter, '_meta.modelId': model.key })
                 .toArray()
+              then({ success: true, data: result })
+            })
+            // Get all models
+            socket.on('getAllModels', async (then) => {
+              const result = await db.collection('Models').find().toArray()
               then({ success: true, data: result })
             })
           } else {
@@ -113,7 +122,7 @@ async function main() {
           socket.on('authenticate', async ({ username, password }) => {
             const user = await db
               .collection('Objects')
-              .findOne({ '_meta.modelId': 'User', username })
+              .findOne({ '_meta.modelId': 'user', username })
             if (bcrypt.compareSync(password, user.password)) {
               console.log(`User ${username} authenticated`)
               socket.emit(
@@ -136,7 +145,7 @@ async function main() {
           // Set-up the server by creating the admin user
           // Todo: data integrity check to prevent injection
           db.collection('Objects').insertOne({
-            _meta: { modelId: 'User' },
+            _meta: { modelId: 'user' },
             username: data.user.username,
             password: bcrypt.hashSync(data.user.password, 8),
           })
