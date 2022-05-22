@@ -1,4 +1,3 @@
-import { ServerHeartbeatStartedEvent } from 'mongodb'
 import initialiseFrontbase from './Scripts/Initialise'
 
 const port = process.env.PORT || 8600
@@ -22,9 +21,7 @@ const whitelist = [
 
 let serverState = 'initialising'
 
-app.get('/', (req, res) => {
-  res.send('<h1>Here comes the app</h1>')
-})
+app.use(['/', '/*'], express.static('/frontbase/system/client/build/'))
 
 // Main() initialises the server
 // If the server has already been set-up we immediately start listening for socket connections
