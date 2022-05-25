@@ -8,11 +8,11 @@ app.set('port', port)
 const http = require('http').Server(app)
 const jwt = require('jsonwebtoken')
 const { MongoClient } = require('mongodb')
-const client = new MongoClient('mongodb://localhost:27017')
+require('dotenv').config()
+const client = new MongoClient(process.env.MONGO_URL)
 
 var bcrypt = require('bcryptjs')
 
-require('dotenv').config()
 const whitelist = [
   'http://localhost:8600',
   'http://localhost:3000',
