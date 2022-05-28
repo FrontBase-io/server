@@ -10,6 +10,7 @@ const jwt = require('jsonwebtoken')
 const { MongoClient } = require('mongodb')
 require('dotenv').config()
 const client = new MongoClient(process.env.MONGO_URL)
+var ObjectId = require('mongodb').ObjectId
 
 var bcrypt = require('bcryptjs')
 
@@ -100,6 +101,15 @@ async function main() {
                 .find({ ...filter, '_meta.modelId': model.key })
                 .toArray()
               then({ success: true, data: result })
+            })
+            // Get Object
+            socket.on('getObject', async (objectId, then) => {
+              then({
+                success: true,
+                data: await db
+                  .collection('Objects')
+                  .findOne({ _id: ObjectId(objectId) }),
+              })
             })
             // Get all models
             socket.on('getAllModels', async (then) => {
