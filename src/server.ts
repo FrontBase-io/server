@@ -13,6 +13,9 @@ const client = new MongoClient(process.env.MONGO_URL)
 var ObjectId = require('mongodb').ObjectId
 
 var bcrypt = require('bcryptjs')
+import { v4 as unique } from 'uuid'
+import { ObjectListener } from './Types/System'
+import { UUID } from 'bson'
 
 const whitelist = [
   'http://localhost:8600',
@@ -40,6 +43,18 @@ async function main() {
     serverState = await initialiseFrontbase(db)
 
   console.log('FrontBase is ready to go!')
+
+  // Listeners
+  // Objects
+  const objectListeners: { [modelKey: string]: ObjectListener[] } = {}
+  db.collection('Objects')
+    .watch({ fullDocument: 'updateLookup' })
+    .on('change', async (change) => {
+      ;(objectListeners[change.fullDocument._meta.modelId] ?? []).map(
+        (listener) => listener.then()
+      )
+    })
+
   require('socket.io')(http, {
     cors: {
       credentials: true,
@@ -86,30 +101,69 @@ async function main() {
           if (user) {
             // Our connection with the user has been authenticated. From here on we can have our regular socket interaction.
             socket.user = user
+            socket.id = unique()
             console.log(`User ${user.username} connected`)
             socket.emit('authenticated', { ...user, password: undefined })
 
             // Authenticated socket events
             // Get Objects
-            socket.on('getObjects', async (modelId, filter, then) => {
+            socket.on('getObjects', async (modelId, filter, sendQueryId) => {
               const model = await db
                 .collection('Models')
                 .findOne({ $or: [{ key: modelId }, { key_plural: modelId }] })
 
-              const result = await db
-                .collection('Objects')
-                .find({ ...filter, '_meta.modelId': model.key })
-                .toArray()
-              then({ success: true, data: result })
+              // Turn this query into a function so we can register it as a realtime listener and execute it directly
+              const queryId = unique()
+              const fetchAndReturnResult = async () => {
+                const data = await db
+                  .collection('Objects')
+                  .find({ ...filter, '_meta.modelId': model.key })
+                  .toArray()
+
+                socket.emit(`receive-${queryId}`, {
+                  success: true,
+                  data,
+                })
+              }
+              if (!objectListeners[model.key]) objectListeners[model.key] = []
+              objectListeners[model.key].push({
+                socketId: socket.id,
+                then: fetchAndReturnResult,
+              })
+              // Send the query ID for subsequent data responses and send initial data.
+              fetchAndReturnResult() // Initial data
+              sendQueryId(queryId)
             })
             // Get Object
-            socket.on('getObject', async (objectId, then) => {
-              then({
-                success: true,
-                data: await db
+            socket.on('getObject', async (objectId, sendQueryId) => {
+              const object = await db
+                .collection('Objects')
+                .findOne({ _id: ObjectId(objectId) })
+
+              const model = await db
+                .collection('Models')
+                .findOne({ key: object._meta.modelId })
+
+              // Turn this query into a function so we can register it as a realtime listener and execute it directly
+              const queryId = unique()
+              const fetchAndReturnResult = async () => {
+                const object = await db
                   .collection('Objects')
-                  .findOne({ _id: ObjectId(objectId) }),
+                  .findOne({ _id: ObjectId(objectId) })
+
+                socket.emit(`receive-${queryId}`, {
+                  success: true,
+                  data: object,
+                })
+              }
+              if (!objectListeners[model.key]) objectListeners[model.key] = []
+              objectListeners[model.key].push({
+                socketId: socket.id,
+                then: fetchAndReturnResult,
               })
+              // Send the query ID for subsequent data responses and send initial data.
+              fetchAndReturnResult() // Initial data
+              sendQueryId(queryId)
             })
             // Get all models
             socket.on('getAllModels', async (then) => {
