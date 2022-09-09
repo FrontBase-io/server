@@ -15,7 +15,6 @@ var ObjectId = require('mongodb').ObjectId
 var bcrypt = require('bcryptjs')
 import { v4 as unique } from 'uuid'
 import { ObjectListener } from './Types/System'
-import { UUID } from 'bson'
 
 const whitelist = [
   'http://localhost:8600',
@@ -134,6 +133,7 @@ async function main() {
               fetchAndReturnResult() // Initial data
               sendQueryId(queryId)
             })
+
             // Get Object
             socket.on('getObject', async (objectId, sendQueryId) => {
               const object = await db
@@ -166,9 +166,23 @@ async function main() {
               sendQueryId(queryId)
             })
             // Get all models
-            socket.on('getAllModels', async (then) => {
-              const result = await db.collection('Models').find().toArray()
-              then({ success: true, data: result })
+            socket.on('getModels', async (filter, sendQueryId) => {
+              const queryId = unique()
+              const fetchAndReturnResult = async () => {
+                const models = await db
+                  .collection('Models')
+                  // Todo: sanitize
+                  .find(filter)
+                  .toArray()
+
+                socket.emit(`receive-${queryId}`, {
+                  success: true,
+                  data: models,
+                })
+              }
+              // Todo: sanitize filter
+              fetchAndReturnResult() // Initial data
+              sendQueryId(queryId)
             })
           } else {
             console.error(`User ${socket.decoded.sub} not found`)
