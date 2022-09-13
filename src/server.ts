@@ -14,7 +14,7 @@ var ObjectId = require('mongodb').ObjectId
 
 var bcrypt = require('bcryptjs')
 import { v4 as unique } from 'uuid'
-import { ObjectListener } from './Types/System'
+import { ModelListener, ObjectListener } from './Types/System'
 
 const whitelist = [
   'http://localhost:8600',
@@ -52,6 +52,12 @@ async function main() {
       ;(objectListeners[change.fullDocument._meta.modelId] ?? []).map(
         (listener) => listener.then()
       )
+    })
+  const modelListeners: ModelListener[] = []
+  db.collection('Models')
+    .watch({ fullDocument: 'updateLookup' })
+    .on('change', async (change) => {
+      modelListeners.map((listener) => listener.then())
     })
 
   require('socket.io')(http, {
@@ -167,23 +173,46 @@ async function main() {
             })
             // Get all models
             socket.on('getModels', async (filter, sendQueryId) => {
+              // Turn this query into a function so we can register it as a realtime listener and execute it directly
               const queryId = unique()
               const fetchAndReturnResult = async () => {
-                const models = await db
+                const data = await db
                   .collection('Models')
-                  // Todo: sanitize
-                  .find(filter)
+                  .find({ ...filter })
                   .toArray()
 
                 socket.emit(`receive-${queryId}`, {
                   success: true,
-                  data: models,
+                  data,
                 })
               }
-              // Todo: sanitize filter
+
+              modelListeners.push({
+                socketId: socket.id,
+                then: fetchAndReturnResult,
+              })
+              // Send the query ID for subsequent data responses and send initial data.
               fetchAndReturnResult() // Initial data
               sendQueryId(queryId)
             })
+            // Update model
+            socket.on(
+              'update-model',
+              async (
+                key: string,
+                changedFields: { [key: string]: any },
+                respond
+              ) => {
+                if (typeof key === 'string') {
+                  const result = await db
+                    .collection('Models')
+                    .updateOne({ key }, { $set: changedFields })
+                  respond({ success: true, result })
+                } else {
+                  respond({ success: false })
+                }
+              }
+            )
           } else {
             console.error(`User ${socket.decoded.sub} not found`)
             socket.emit('authenticationError')
