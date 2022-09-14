@@ -119,6 +119,9 @@ async function main() {
 
               // Turn this query into a function so we can register it as a realtime listener and execute it directly
               const queryId = unique()
+              // Mongo wants _objectId's as id's, not strings
+              if (filter._id) filter._id = new ObjectId(filter._id)
+
               const fetchAndReturnResult = async () => {
                 const data = await db
                   .collection('Objects')
