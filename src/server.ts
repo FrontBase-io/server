@@ -24,8 +24,6 @@ const whitelist = [
 
 let serverState = 'initialising'
 
-app.use(['/', '/*'], express.static('/frontbase/system/client/build/'))
-
 // Main() initialises the server
 // If the server has already been set-up we immediately start listening for socket connections
 // Otherwise we perform the initial set-up and then start listening for socket connections
@@ -264,6 +262,8 @@ async function main() {
       }
     })
 
+  app.use(express.static('/frontbase/system/client/build/'))
+  app.use('*', express.static('/frontbase/system/client/build/'))
   return
 }
 
