@@ -196,6 +196,7 @@ async function main() {
               fetchAndReturnResult() // Initial data
               sendQueryId(queryId)
             })
+
             // Update model
             socket.on(
               'update-model',
@@ -208,6 +209,28 @@ async function main() {
                   const result = await db
                     .collection('Models')
                     .updateOne({ key }, { $set: changedFields })
+                  respond({ success: true, result })
+                } else {
+                  respond({ success: false })
+                }
+              }
+            )
+
+            // Update object
+            socket.on(
+              'update-object',
+              async (
+                _id: string,
+                changedFields: { [key: string]: any },
+                respond
+              ) => {
+                if (typeof _id === 'string') {
+                  const result = await db
+                    .collection('Objects')
+                    .updateOne(
+                      { _id: new ObjectId(_id) },
+                      { $set: changedFields }
+                    )
                   respond({ success: true, result })
                 } else {
                   respond({ success: false })
