@@ -237,6 +237,12 @@ async function main() {
                 }
               }
             )
+
+            // Update object
+            socket.on('new-model', async (input, respond) => {
+              const result = await db.collection('Models').insert(input)
+              respond({ success: true, result })
+            })
           } else {
             console.error(`User ${socket.decoded.sub} not found`)
             socket.emit('authenticationError')
