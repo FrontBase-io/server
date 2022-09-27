@@ -238,9 +238,19 @@ async function main() {
               }
             )
 
-            // Update object
+            // Insert model
             socket.on('new-model', async (input, respond) => {
               const result = await db.collection('Models').insert(input)
+              respond({ success: true, result })
+            })
+
+            // Insert object
+            socket.on('insert-object', async (modelId, input, respond) => {
+              console.log({ _meta: { modelId }, ...input })
+
+              const result = await db
+                .collection('Objects')
+                .insert({ _meta: { modelId }, ...input })
               respond({ success: true, result })
             })
           } else {
